@@ -147,7 +147,6 @@ class Program
             for (int robotId = 0; robotId < 4; robotId++)
             {
                 var posIndex = state.RobotPos[robotId];
-                var toBreak = false;
                 
                 for (int i = 0; i < distanceTable.GetLength(0); i++)
                 {
@@ -178,13 +177,6 @@ class Program
                     }
                     best[newState] = newCost;
                     pq.Enqueue(newState, newCost);
-                    toBreak = true;
-                    break;
-                }
-
-                if (toBreak)
-                {
-                    break;
                 }
             }
         }
