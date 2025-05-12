@@ -156,9 +156,11 @@ class Program
                     {
                         continue;
                     }
+                    
                     var nextKey = edge.To;
                     if (state.Keys.Contains(nextKey)
-                        || !edge.KeyNeeded.All(k => state.Keys.Contains(k)))   
+                        || nextKey == '@'
+                        || !edge.KeyNeeded.All(k => state.Keys.Contains(char.ToLower(k))))   
                     {
                         continue;
                     }
@@ -169,13 +171,15 @@ class Program
                     newKeys.Add(nextKey);
                     var newState = new State(newRobotPos, newKeys);
                     var newCost = costSoFar + edge.Cost;
-                    
-                    if (!best.TryGetValue(newState, out int oldCost) || newCost < oldCost)
+
+                    if (best.TryGetValue(newState, out int oldCost) && newCost >= oldCost)
                     {
-                        best[newState] = newCost;
-                        pq.Enqueue(newState, newCost);
-                        break;
+                        continue;
                     }
+                    best[newState] = newCost;
+                    pq.Enqueue(newState, newCost);
+                    toBreak = true;
+                    break;
                 }
 
                 if (toBreak)
