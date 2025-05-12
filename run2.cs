@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-
 using System.Linq;
 
 
@@ -10,39 +9,57 @@ class Program
     static readonly char[] DoorsChar = KeysChar.Select(char.ToUpper).ToArray();
     static readonly int[] DX = { 1, -1, 0, 0 };
     static readonly int[] DY = { 0, 0, 1, -1 };
-    
+
     static HashSet<char> CharToCollect { get; set; } = new();
 
     class State : IEquatable<State>
     {
-        public readonly int[] RobotPos;
-        public readonly HashSet<char> Keys;
-        private readonly int hash;
+        public int[] RobotPos { get; }
+        public uint KeysMask { get; }
 
-        public State(int[] robots, HashSet<char> keys)
+
+        public State(int[] robotPos, uint keysMask)
         {
-            RobotPos = robots.ToArray();
-            Keys   = new HashSet<char>(keys);
+            RobotPos = robotPos;
+            KeysMask = keysMask;
+        }
+
+        public bool HasKey(char k) => (KeysMask & (1u << (k - 'a'))) != 0;
+        public int KeysCount => System.Numerics.BitOperations.PopCount(KeysMask);
+
+        public override int GetHashCode()
+        {
             unchecked
             {
-                hash = 17;
-                foreach (var p in RobotPos) hash = hash * 31 + p;
-                foreach (var k in Keys.OrderBy(c=>c)) hash = hash * 31 + k;
+                var h = (int)KeysMask;
+                foreach (var p in RobotPos)
+                {
+                    h = h * 31 + p;
+                }
+
+                return h;
             }
         }
 
         public bool Equals(State other)
         {
-            if (other is null) return false;
-            if (!hash.Equals(other.hash)) return false;
+            if (other is null || KeysMask != other.KeysMask)
+            {
+                return false;
+            }
+
             for (int i = 0; i < RobotPos.Length; i++)
-                if (RobotPos[i] != other.RobotPos[i]) return false;
-            return Keys.SetEquals(other.Keys);
+                if (RobotPos[i] != other.RobotPos[i])
+                {
+                    return false;
+                }
+
+            return true;
         }
-        public override bool Equals(object obj) => Equals(obj as State);
-        public override int GetHashCode() => hash;
+
+        public override bool Equals(object obj) => obj is State s && Equals(s);
     }
-    
+
     class StateComparer : IEqualityComparer<State>
     {
         public bool Equals(State x, State y) => x.Equals(y);
@@ -52,9 +69,9 @@ class Program
     class Edge
     {
         public char From { get; set; }
-        public char To { get; set; }
-        public int Cost { get; set; }
-        public HashSet<char> KeyNeeded { get; set; }
+        public char To { get; }
+        public int Cost { get; }
+        public HashSet<char> KeyNeeded { get; }
         public HashSet<char> KeyCollected { get; set; }
 
         public Edge(char from, char to, int cost, HashSet<char> keyCollected, HashSet<char> keyNeeded)
@@ -69,8 +86,8 @@ class Program
 
     class Vertice
     {
-        public (int, int) Coordinates { get; set; }
-        public char Char { get; set; }
+        public (int, int) Coordinates { get; }
+        public char Char { get; }
 
         public Vertice((int, int) coordinates, char c)
         {
@@ -81,11 +98,11 @@ class Program
 
     class BfsResult
     {
-        public Dictionary<(int, int), int> Distances { get; set; }
-        public Dictionary<(int, int), HashSet<char>> Keys { get; set; }
-        public Dictionary<(int, int), HashSet<char>> Doors { get; set; }
+        public Dictionary<(int, int), int> Distances { get; }
+        public Dictionary<(int, int), HashSet<char>> Keys { get; }
+        public Dictionary<(int, int), HashSet<char>> Doors { get; }
 
-        public BfsResult(Dictionary<(int, int), int> distances, 
+        public BfsResult(Dictionary<(int, int), int> distances,
             Dictionary<(int, int), HashSet<char>> keys, Dictionary<(int, int), HashSet<char>> doors)
         {
             Distances = distances;
@@ -98,7 +115,7 @@ class Program
             return Distances.ContainsKey(poi.Coordinates);
         }
     }
-    
+
     static List<List<char>> GetInput()
     {
         var data = new List<List<char>>();
@@ -110,7 +127,7 @@ class Program
                 break;
             data.Add(line.ToCharArray().ToList());
         }
-        
+
         return data;
     }
 
@@ -120,7 +137,7 @@ class Program
         var pois = GetPois(data);
         var distanceTable = GetDistancesBetweenPois(data, pois);
         var result = Dijkstra(distanceTable, pois);
-        
+
         return result;
     }
 
@@ -128,26 +145,25 @@ class Program
     {
         var pq = new PriorityQueue<State, int>();
         var robotPos = Enumerable.Range(0, 4).ToArray();
-        var collectedKeys = new HashSet<char>();
-        var initialState = new State(robotPos, collectedKeys);
+        var initialState = new State(robotPos, 0);
         pq.Enqueue(initialState, 0);
-        
+
         var best = new Dictionary<State, int>(new StateComparer());
         best[initialState] = 0;
-        
+
         while (pq.Count > 0)
         {
             pq.TryDequeue(out var state, out int costSoFar);
 
-            if (state.Keys.Count == CharToCollect.Count)
+            if (state.KeysCount == CharToCollect.Count)
             {
                 return costSoFar;
             }
-            
+
             for (int robotId = 0; robotId < 4; robotId++)
             {
                 var posIndex = state.RobotPos[robotId];
-                
+
                 for (int i = 0; i < distanceTable.GetLength(0); i++)
                 {
                     var edge = distanceTable[posIndex, i];
@@ -155,19 +171,18 @@ class Program
                     {
                         continue;
                     }
-                    
+
                     var nextKey = edge.To;
-                    if (state.Keys.Contains(nextKey)
+                    if (state.HasKey(nextKey)
                         || nextKey == '@'
-                        || !edge.KeyNeeded.All(k => state.Keys.Contains(char.ToLower(k))))   
+                        || !edge.KeyNeeded.All(k => state.HasKey(char.ToLower(k))))
                     {
                         continue;
                     }
 
                     var newRobotPos = state.RobotPos.ToArray();
                     newRobotPos[robotId] = i;
-                    var newKeys = new HashSet<char>(state.Keys);
-                    newKeys.Add(nextKey);
+                    var newKeys = state.KeysMask | (1u << (nextKey - 'a'));
                     var newState = new State(newRobotPos, newKeys);
                     var newCost = costSoFar + edge.Cost;
 
@@ -175,12 +190,13 @@ class Program
                     {
                         continue;
                     }
+
                     best[newState] = newCost;
                     pq.Enqueue(newState, newCost);
                 }
             }
         }
-        
+
         return -1;
     }
 
@@ -200,8 +216,8 @@ class Program
                 if (bfsResult.HasPoi(pois[j]))
                 {
                     distanceTable[i, j] = new Edge(
-                        pois[i].Char, 
-                        pois[j].Char, 
+                        pois[i].Char,
+                        pois[j].Char,
                         bfsResult.Distances[pois[j].Coordinates],
                         bfsResult.Keys[pois[j].Coordinates],
                         bfsResult.Doors[pois[j].Coordinates]);
@@ -216,19 +232,19 @@ class Program
     {
         var distances = new Dictionary<(int, int), int>();
         distances[start] = 0;
-        
+
         var keys = new Dictionary<(int, int), HashSet<char>>();
         keys[start] = new HashSet<char>();
-        
+
         var doors = new Dictionary<(int, int), HashSet<char>>();
         doors[start] = new HashSet<char>();
-        
+
         var queue = new Queue<(int, int)>();
         queue.Enqueue(start);
 
         var rows = data[0].Count;
         var columns = data.Count;
-        
+
         while (queue.Count > 0)
         {
             var currentPos = queue.Dequeue();
@@ -236,10 +252,10 @@ class Program
             {
                 var nextPos = (currentPos.Item1 + DX[i], currentPos.Item2 + DY[i]);
                 var next = data[nextPos.Item2][nextPos.Item1];
-                if (nextPos.Item1 < 0 
-                    || nextPos.Item1 > rows 
-                    || nextPos.Item2 < 0 
-                    || nextPos.Item2 > columns 
+                if (nextPos.Item1 < 0
+                    || nextPos.Item1 > rows
+                    || nextPos.Item2 < 0
+                    || nextPos.Item2 > columns
                     || next == '#'
                     || distances.ContainsKey(nextPos))
                 {
@@ -247,15 +263,15 @@ class Program
                 }
 
                 distances[nextPos] = distances[currentPos] + 1;
-                
+
                 keys[nextPos] = new HashSet<char>(keys[currentPos]);
                 if (char.IsLower(next))
                     keys[nextPos].Add(next);
-                
+
                 doors[nextPos] = new HashSet<char>(doors[currentPos]);
                 if (char.IsUpper(next))
                     doors[nextPos].Add(next);
-                
+
                 queue.Enqueue(nextPos);
             }
         }
@@ -298,7 +314,7 @@ class Program
     {
         var data = GetInput();
         var result = Solve(data);
-        
+
         if (result == -1)
         {
             Console.WriteLine("No solution found");
