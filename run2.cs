@@ -234,8 +234,8 @@ class Program
         var queue = new Queue<(int, int)>();
         queue.Enqueue(start);
 
-        var rows = data.Count;
-        var columns = data[0].Count;
+        var rows = data[0].Count;
+        var columns = data.Count;
         
         while (queue.Count > 0)
         {
