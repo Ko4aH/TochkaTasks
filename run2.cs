@@ -7,10 +7,11 @@ class Program
 {
     static readonly char[] KeysChar = Enumerable.Range('a', 26).Select(i => (char)i).ToArray();
     static readonly char[] DoorsChar = KeysChar.Select(char.ToUpper).ToArray();
-    static readonly int[] DX = { 1, -1, 0, 0 };
-    static readonly int[] DY = { 0, 0, 1, -1 };
+    static readonly int[] Dx = { 1, -1, 0, 0 };
+    static readonly int[] Dy = { 0, 0, 1, -1 };
 
     static HashSet<char> CharToCollect { get; set; } = new();
+    private static int RobotCount { get; set; }
 
     class State : IEquatable<State>
     {
@@ -110,9 +111,9 @@ class Program
             Doors = doors;
         }
 
-        public bool HasPoi(Vertice poi)
+        public bool HasPoi((int, int) point)
         {
-            return Distances.ContainsKey(poi.Coordinates);
+            return Distances.ContainsKey(point);
         }
     }
 
@@ -160,7 +161,7 @@ class Program
                 return costSoFar;
             }
 
-            for (int robotId = 0; robotId < 4; robotId++)
+            for (int robotId = 0; robotId < RobotCount; robotId++)
             {
                 var posIndex = state.RobotPos[robotId];
 
@@ -213,7 +214,7 @@ class Program
                     continue;
                 }
 
-                if (bfsResult.HasPoi(pois[j]))
+                if (bfsResult.HasPoi(pois[j].Coordinates))
                 {
                     distanceTable[i, j] = new Edge(
                         pois[i].Char,
@@ -239,6 +240,8 @@ class Program
         var doors = new Dictionary<(int, int), HashSet<char>>();
         doors[start] = new HashSet<char>();
 
+        var result = new BfsResult(distances, keys, doors);
+
         var queue = new Queue<(int, int)>();
         queue.Enqueue(start);
 
@@ -250,20 +253,24 @@ class Program
             var currentPos = queue.Dequeue();
             for (int i = 0; i < 4; i++)
             {
-                var nextPos = (currentPos.Item1 + DX[i], currentPos.Item2 + DY[i]);
-                var next = data[nextPos.Item2][nextPos.Item1];
+                var nextPos = (currentPos.Item1 + Dx[i], currentPos.Item2 + Dy[i]);
                 if (nextPos.Item1 < 0
-                    || nextPos.Item1 > rows
+                    || nextPos.Item1 >= rows
                     || nextPos.Item2 < 0
-                    || nextPos.Item2 > columns
-                    || next == '#'
-                    || distances.ContainsKey(nextPos))
+                    || nextPos.Item2 >= columns
+                    || result.HasPoi(nextPos))
+                {
+                    continue;
+                }
+                
+                var next = data[nextPos.Item2][nextPos.Item1];
+                if (next == '#')
                 {
                     continue;
                 }
 
                 distances[nextPos] = distances[currentPos] + 1;
-
+                
                 keys[nextPos] = new HashSet<char>(keys[currentPos]);
                 if (char.IsLower(next))
                     keys[nextPos].Add(next);
@@ -276,7 +283,7 @@ class Program
             }
         }
 
-        return new BfsResult(distances, keys, doors);
+        return result;
     }
 
     static Vertice[] GetPois(List<List<char>> data)
@@ -292,6 +299,7 @@ class Program
                     pois.Add(new Vertice(
                         (j, i),
                         cell));
+                    RobotCount++;
                 }
 
                 if (KeysChar.Contains(cell))
