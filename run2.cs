@@ -10,7 +10,7 @@ class Program
     static readonly int[] Dx = { 1, -1, 0, 0 };
     static readonly int[] Dy = { 0, 0, 1, -1 };
 
-    static HashSet<char> CharToCollect { get; set; } = new();
+    static HashSet<char> CharToCollect { get; set; } = new HashSet<char>();
     private static int RobotCount { get; set; }
 
     class State : IEquatable<State>
@@ -26,6 +26,7 @@ class Program
         }
 
         public bool HasKey(char k) => (KeysMask & (1u << (k - 'a'))) != 0;
+
         public int KeysCount => System.Numerics.BitOperations.PopCount(KeysMask);
 
         public override int GetHashCode()
@@ -122,7 +123,7 @@ class Program
         var data = new List<List<char>>();
         string line;
 
-        while ((line = Console.ReadLine()) is not null)
+        while ((line = Console.ReadLine()) != null)
         {
             if (line.Length == 0)
                 break;
@@ -137,15 +138,15 @@ class Program
     {
         var pois = GetPois(data);
         var distanceTable = GetDistancesBetweenPois(data, pois);
-        var result = Dijkstra(distanceTable, pois);
+        var result = Dijkstra(distanceTable);
 
         return result;
     }
 
-    static int Dijkstra(Edge[,] distanceTable, Vertice[] pois)
+    static int Dijkstra(Edge[,] distanceTable)
     {
         var pq = new PriorityQueue<State, int>();
-        var robotPos = Enumerable.Range(0, 4).ToArray();
+        var robotPos = Enumerable.Range(0, RobotCount).ToArray();
         var initialState = new State(robotPos, 0);
         pq.Enqueue(initialState, 0);
 
@@ -204,24 +205,24 @@ class Program
     static Edge[,] GetDistancesBetweenPois(List<List<char>> data, Vertice[] pois)
     {
         var distanceTable = new Edge[pois.Length, pois.Length];
-        for (int i = 0; i < pois.Length; i++)
+        for (int from = 0; from < pois.Length; from++)
         {
-            var bfsResult = BfsFrom(data, pois[i].Coordinates);
-            for (int j = 0; j < pois.Length; j++)
+            var bfsResult = BfsFrom(data, pois[from].Coordinates);
+            for (int to = 0; to < pois.Length; to++)
             {
-                if (i == j)
+                if (from == to)
                 {
                     continue;
                 }
 
-                if (bfsResult.HasPoi(pois[j].Coordinates))
+                if (bfsResult.HasPoi(pois[to].Coordinates))
                 {
-                    distanceTable[i, j] = new Edge(
-                        pois[i].Char,
-                        pois[j].Char,
-                        bfsResult.Distances[pois[j].Coordinates],
-                        bfsResult.Keys[pois[j].Coordinates],
-                        bfsResult.Doors[pois[j].Coordinates]);
+                    distanceTable[from, to] = new Edge(
+                        pois[from].Char,
+                        pois[to].Char,
+                        bfsResult.Distances[pois[to].Coordinates],
+                        bfsResult.Keys[pois[to].Coordinates],
+                        bfsResult.Doors[pois[to].Coordinates]);
                 }
             }
         }
@@ -262,7 +263,7 @@ class Program
                 {
                     continue;
                 }
-                
+
                 var next = data[nextPos.Item2][nextPos.Item1];
                 if (next == '#')
                 {
@@ -270,7 +271,7 @@ class Program
                 }
 
                 distances[nextPos] = distances[currentPos] + 1;
-                
+
                 keys[nextPos] = new HashSet<char>(keys[currentPos]);
                 if (char.IsLower(next))
                     keys[nextPos].Add(next);
@@ -312,10 +313,10 @@ class Program
             }
         }
 
-        var sortedPois = pois
+        return pois
             .OrderBy(poi => poi.Char == '@' ? 0 : 1)
-            .ThenBy(poi => poi.Char);
-        return sortedPois.ToArray();
+            .ThenBy(poi => poi.Char)
+            .ToArray();
     }
 
     static void Main()
