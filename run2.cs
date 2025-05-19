@@ -27,7 +27,21 @@ class Program
 
         public bool HasKey(char k) => (KeysMask & (1u << (k - 'a'))) != 0;
 
-        public int KeysCount => System.Numerics.BitOperations.PopCount(KeysMask);
+        public int KeysCount
+        {
+            get
+            {
+                var mask = KeysMask;
+                var count = 0;
+                while (mask != 0)
+                {
+                    mask &= mask - 1;
+                    count++;
+                }
+
+                return count;
+            }
+        }
 
         public override int GetHashCode()
         {
@@ -145,18 +159,41 @@ class Program
 
     static int Dijkstra(Edge[,] distanceTable)
     {
-        var pq = new PriorityQueue<State, int>();
+        var pq = new SortedDictionary<int, Queue<State>>();
+
+        void Enqueue(State state, int cost)
+        {
+            if (!pq.TryGetValue(cost, out var bucket))
+                pq[cost] = bucket = new Queue<State>();
+            bucket.Enqueue(state);
+        }
+
+        bool TryDequeue(out State state, out int cost)
+        {
+            if (pq.Count == 0)
+            {
+                state = null;
+                cost = 0;
+                return false;
+            }
+
+            var first = pq.First();
+            cost = first.Key;
+            var queue = first.Value;
+            state = queue.Dequeue();
+            if (queue.Count == 0) pq.Remove(first.Key);
+            return true;
+        }
+
         var robotPos = Enumerable.Range(0, RobotCount).ToArray();
         var initialState = new State(robotPos, 0);
-        pq.Enqueue(initialState, 0);
+        Enqueue(initialState, 0);
 
         var best = new Dictionary<State, int>(new StateComparer());
         best[initialState] = 0;
 
-        while (pq.Count > 0)
+        while (TryDequeue(out var state, out int costSoFar))
         {
-            pq.TryDequeue(out var state, out int costSoFar);
-
             if (state.KeysCount == CharToCollect.Count)
             {
                 return costSoFar;
@@ -194,7 +231,7 @@ class Program
                     }
 
                     best[newState] = newCost;
-                    pq.Enqueue(newState, newCost);
+                    Enqueue(newState, newCost);
                 }
             }
         }
