@@ -9,7 +9,17 @@ class HotelCapacity
         CheckOut = -1
     }
 
-    record HotelEvent(string Date, TimelineEvent TimelineEvent);
+    class HotelEvent
+    {
+        public string Date { get; set; }
+        public TimelineEvent TimelineEvent { get; set; }
+
+        public HotelEvent(string date, TimelineEvent timelineEvent)
+        {
+            Date = date;
+            TimelineEvent = timelineEvent;
+        }
+    }
 
     static IEnumerable<HotelEvent> BuildTimeline(List<Guest> guests)
     {
